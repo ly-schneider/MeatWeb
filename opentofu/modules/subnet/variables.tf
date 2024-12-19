@@ -15,7 +15,7 @@ variable "map_public_ip_on_launch" {
 }
 
 variable "availability_zone" {
-  description = "The availability zone(s) to deploy the subnet in."
+  description = "The availability zone for the subnet."
   type        = string
 }
 
