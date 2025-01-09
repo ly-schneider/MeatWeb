@@ -158,7 +158,7 @@ def format_coordinates(coordinates):
 
     formatted_coords = []
     for name, x, y, z, created_at in coordinates:
-        local_time = created_at.replace(tzinfo=utc).astimezone(cet).strftime("%d.%m.%Y %H:%M:%S")
+        local_time = created_at.replace(tzinfo=utc).astimezone(cet).strftime("%d.%m.%Y %H:%M")
         formatted_coords.append(f"{name}: X=**{x}**, Y=**{y}**, Z=**{z}**, Erstellt am: {local_time}")
 
     return "\n".join(formatted_coords)
