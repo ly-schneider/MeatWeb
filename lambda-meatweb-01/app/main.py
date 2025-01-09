@@ -1,166 +1,167 @@
 import os
-import psycopg
-import pytz
-from datetime import datetime
 from flask import Flask, jsonify, request
 from mangum import Mangum
 from asgiref.wsgi import WsgiToAsgi
 from discord_interactions import verify_key_decorator
+import psycopg
+from datetime import datetime
+import pytz
 
-DISCORD_PUBLIC_KEY = os.environ.get("DISCORD_PUBLIC_KEY")
+# Environment Variables
+DISCORD_PUBLIC_KEY = os.getenv("DISCORD_PUBLIC_KEY")
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST"),
+    "port": os.getenv("DB_PORT", 5432),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "dbname": os.getenv("DB_NAME")
+}
 
-DB_HOST = os.environ.get("DB_HOST")
-DB_PORT = os.environ.get("DB_PORT", 5432)
-DB_USER = os.environ.get("DB_USER")
-DB_PASSWORD = os.environ.get("DB_PASSWORD")
-DB_NAME = os.environ.get("DB_NAME")
-
+# Flask Setup
 app = Flask(__name__)
 asgi_app = WsgiToAsgi(app)
 handler = Mangum(asgi_app)
 
 def get_db_connection():
-    return psycopg.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        dbname=DB_NAME
-    )
+    return psycopg.connect(**DB_CONFIG)
+
+def execute_query(sql, params=(), fetchone=False, fetchall=False):
+    """Helper function to interact with the database."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            if fetchone:
+                return cur.fetchone()
+            if fetchall:
+                return cur.fetchall()
+            conn.commit()
 
 @app.route("/", methods=["POST"])
 async def interactions():
-    print(f"👉 Anfrage: {request.json}")
-    raw_request = request.json
-    return interact(raw_request)
+    return interact(request.json)
 
 @verify_key_decorator(DISCORD_PUBLIC_KEY)
 def interact(raw_request):
-    """Haupt-Interaktions-Handler."""
-    if raw_request["type"] == 1:  # DISCORD PING PONG
-        response_data = {"type": 1}
-        return jsonify(response_data)
+    if raw_request.get("type") == 1:  # Discord PING
+        return jsonify({"type": 1})
 
-    data = raw_request["data"]
-    command_name = data["name"]
-    member = raw_request["member"]
+    command = raw_request["data"]["name"]
+    subcommand = raw_request["data"].get("options", [{}])[0].get("name")
+    user = raw_request["member"]["user"]["username"]
 
-    if command_name == "cords":
-        subcommand = data["options"][0]["name"]
+    if command == "cords":
+        return jsonify(handle_cords_command(subcommand, raw_request, user))
 
-        if subcommand == "add":
-            options = data["options"][0]["options"]
-            name = next(option["value"] for option in options if option["name"] == "name")
-            x = next(option["value"] for option in options if option["name"] == "x")
-            y = next(option["value"] for option in options if option["name"] == "y")
-            z = next(option["value"] for option in options if option["name"] == "z")
+    return jsonify({"type": 4, "data": {"content": "Unbekannter Befehl."}})
 
-            try:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        sql = "SELECT ID_Profile FROM Profile WHERE Name = %s;"
-                        cur.execute(sql, (member["user"]["username"],))
-                        profile_id = cur.fetchone()
+def handle_cords_command(subcommand, raw_request, username):
+    options = raw_request["data"].get("options", [{}])[0].get("options", [])
 
-                        if not profile_id:
-                            sql = "INSERT INTO Profile (Name) VALUES (%s) RETURNING ID_Profile;"
-                            cur.execute(sql, (member["user"]["username"],))
-                            profile_id = cur.fetchone()[0]
-                        else:
-                            profile_id = profile_id[0]
+    if subcommand == "add":
+        return handle_add_command(options, username)
 
-                        sql = "SELECT ID_Coordinate FROM Coordinate WHERE Name = %s AND Profile_ID = %s;"
-                        cur.execute(sql, (name, profile_id))
-                        existing_coordinate = cur.fetchone()
+    if subcommand == "list":
+        return handle_list_command(username)
 
-                        if existing_coordinate:
-                            message_content = f"Koordinate '{name}' existiert bereits für dein Profil."
-                        else:
-                            sql = """
-                                INSERT INTO Coordinate (Name, X, Y, Z, Profile_ID)
-                                VALUES (%s, %s, %s, %s, %s);
-                            """
-                            cur.execute(sql, (name, x, y, z, profile_id))
-                            message_content = f"Koordinate '{name}' mit Werten: X={x}, Y={y}, Z={z} zu deinem Profil hinzugefügt."
-                        conn.commit()
+    if subcommand == "remove":
+        return handle_remove_command(options, username)
 
-            except Exception as e:
-                message_content = f"Fehler beim Hinzufügen der Koordinate: {str(e)}"
+    return {"type": 4, "data": {"content": "Unbekannter Unterbefehl."}}
 
-        elif subcommand == "list":
-            try:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        sql = """
-                            SELECT C.Name, C.X, C.Y, C.Z, C.CreatedAt
-                            FROM Coordinate C
-                            JOIN Profile P ON C.Profile_ID = P.ID_Profile
-                            WHERE P.Name = %s;
-                        """
-                        cur.execute(sql, (member["user"]["username"],))
-                        coordinates = cur.fetchall()
+def handle_add_command(options, username):
+    try:
+        name, x, y, z = [get_option_value(options, key) for key in ("name", "x", "y", "z")]
+        profile_id = get_or_create_profile(username)
 
-                        if not coordinates:
-                            message_content = "Keine Koordinaten für dein Profil gefunden."
-                        else:
-                            # UTC+1 Zeitzone
-                            utc = pytz.utc
-                            cet = pytz.timezone('Europe/Berlin')
+        existing = execute_query(
+            "SELECT ID_Coordinate FROM Coordinate WHERE Name = %s AND Profile_ID = %s;",
+            (name, profile_id),
+            fetchone=True
+        )
 
-                            def format_coordinate(coord):
-                                created_at_utc = coord[4].replace(tzinfo=utc)
-                                created_at_cet = created_at_utc.astimezone(cet)
-                                formatted_time = created_at_cet.strftime("%d.%m.%Y %H:%M:%S")
-                                return f"{coord[0]}: X: **{coord[1]}**, Y: **{coord[2]}**, Z: **{coord[3]}**. Erstellt am: {formatted_time}"
+        if existing:
+            return {"type": 4, "data": {"content": f"Koordinate '{name}' existiert bereits."}}
 
-                            coordinates_list = "\n".join(
-                                format_coordinate(coordinate) for coordinate in coordinates
-                            )
-                            message_content = f"Koordinaten für dein Profil:\n\n{coordinates_list}"
+        execute_query(
+            """
+            INSERT INTO Coordinate (Name, X, Y, Z, Profile_ID)
+            VALUES (%s, %s, %s, %s, %s);
+            """,
+            (name, x, y, z, profile_id)
+        )
 
-            except Exception as e:
-                message_content = f"Fehler beim Abrufen der Koordinaten: {str(e)}"
+        return {"type": 4, "data": {"content": f"Koordinate '{name}' hinzugefügt."}}
+    except Exception as e:
+        return {"type": 4, "data": {"content": f"Fehler: {str(e)}"}}
 
-        elif subcommand == "remove":
-            options = data["options"][0]["options"]
-            name = next(option["value"] for option in options if option["name"] == "name")
+def handle_list_command(username):
+    try:
+        sql = """
+            SELECT C.Name, C.X, C.Y, C.Z, C.CreatedAt
+            FROM Coordinate C
+            JOIN Profile P ON C.Profile_ID = P.ID_Profile
+            WHERE P.Name = %s;
+        """
+        coordinates = execute_query(sql, (username,), fetchall=True)
 
-            try:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        sql = "SELECT ID_Profile FROM Profile WHERE Name = %s;"
-                        cur.execute(sql, (member["user"]["username"],))
-                        profile_id = cur.fetchone()
+        if not coordinates:
+            return {"type": 4, "data": {"content": "Keine Koordinaten gefunden."}}
 
-                        if not profile_id:
-                            message_content = f"Keine Koordinate '{name}' für dein Profil gefunden."
-                        else:
-                            profile_id = profile_id[0]
+        formatted_coords = format_coordinates(coordinates)
+        return {"type": 4, "data": {"content": formatted_coords}}
+    except Exception as e:
+        return {"type": 4, "data": {"content": f"Fehler: {str(e)}"}}
 
-                            sql = "SELECT ID_Coordinate FROM Coordinate WHERE Name = %s AND Profile_ID = %s;"
-                            cur.execute(sql, (name, profile_id))
-                            coordinate_id = cur.fetchone()
+def handle_remove_command(options, username):
+    try:
+        name = get_option_value(options, "name")
+        profile_id = get_profile_id(username)
 
-                            if not coordinate_id:
-                                message_content = f"Keine Koordinate '{name}' für dein Profil gefunden."
-                            else:
-                                sql = "DELETE FROM Coordinate WHERE ID_Coordinate = %s;"
-                                cur.execute(sql, (coordinate_id[0],))
-                                conn.commit()
-                                message_content = f"Koordinate '{name}' erfolgreich aus deinem Profil entfernt."
-            except Exception as e:
-                message_content = f"Fehler beim Entfernen der Koordinate: {str(e)}"
+        if not profile_id:
+            return {"type": 4, "data": {"content": "Profil nicht gefunden."}}
 
-        else:
-            message_content = "Unbekannter Unterbefehl für 'cords'."
-    else:
-        message_content = "Unbekannter Befehl."
+        existing = execute_query(
+            "SELECT ID_Coordinate FROM Coordinate WHERE Name = %s AND Profile_ID = %s;",
+            (name, profile_id),
+            fetchone=True
+        )
 
-    response_data = {
-        "type": 4,
-        "data": {"content": message_content},
-    }
-    return jsonify(response_data)
+        if not existing:
+            return {"type": 4, "data": {"content": f"Koordinate '{name}' nicht gefunden."}}
+
+        execute_query("DELETE FROM Coordinate WHERE ID_Coordinate = %s;", (existing[0],))
+        return {"type": 4, "data": {"content": f"Koordinate '{name}' entfernt."}}
+    except Exception as e:
+        return {"type": 4, "data": {"content": f"Fehler: {str(e)}"}}
+
+def get_profile_id(username):
+    return execute_query("SELECT ID_Profile FROM Profile WHERE Name = %s;", (username,), fetchone=True)
+
+def get_or_create_profile(username):
+    profile = get_profile_id(username)
+
+    if not profile:
+        return execute_query(
+            "INSERT INTO Profile (Name) VALUES (%s) RETURNING ID_Profile;",
+            (username,),
+            fetchone=True
+        )[0]
+
+    return profile[0]
+
+def get_option_value(options, key):
+    return next(option["value"] for option in options if option["name"] == key)
+
+def format_coordinates(coordinates):
+    utc = pytz.utc
+    cet = pytz.timezone('Europe/Berlin')
+
+    formatted_coords = []
+    for name, x, y, z, created_at in coordinates:
+        local_time = created_at.replace(tzinfo=utc).astimezone(cet).strftime("%d.%m.%Y %H:%M:%S")
+        formatted_coords.append(f"{name}: X=**{x}**, Y=**{y}**, Z=**{z}**, Erstellt am: {local_time}")
+
+    return "\n".join(formatted_coords)
 
 if __name__ == "__main__":
     app.run(debug=True)
