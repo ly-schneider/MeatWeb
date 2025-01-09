@@ -28,7 +28,6 @@ module "subnet_meatweb_01" {
 
   vpc_id            = module.vpc_meatweb_01.id
   cidr_block        = "172.30.0.0/24"
-  map_public_ip_on_launch = true
   availability_zone = "us-east-1a"
 
   tags = {
@@ -41,7 +40,6 @@ module "subnet_meatweb_02" {
 
   vpc_id            = module.vpc_meatweb_01.id
   cidr_block        = "172.30.1.0/24"
-  map_public_ip_on_launch = true
   availability_zone = "us-east-1a"
 
   tags = {
@@ -54,12 +52,55 @@ module "subnet_meatweb_03" {
 
   vpc_id            = module.vpc_meatweb_01.id
   cidr_block        = "172.30.2.0/24"
-  map_public_ip_on_launch = true
   availability_zone = "us-east-1b"
 
   tags = {
     Name = "Subnet-MeatWeb-03"
   }
+}
+
+module "igw_meatweb_01" {
+  source = "./modules/internet_gateway"
+
+  vpc_id = module.vpc_meatweb_01.id
+
+  tags = {
+    Name = "IGW-MeatWeb-01"
+  }
+}
+
+module "rt_meatweb_01" {
+  source = "./modules/route_table"
+
+  vpc_id = module.vpc_meatweb_01.id
+
+  cidr_block = "0.0.0.0/0"
+  gateway_id = module.igw_meatweb_01.id
+
+  tags = {
+    Name = "RT-MeatWeb-01"
+  }
+}
+
+module "rta_meatweb_01" {
+  source = "./modules/route_table_association"
+
+  subnet_id      = module.subnet_meatweb_01.id
+  route_table_id = module.rt_meatweb_01.id
+}
+
+module "rta_meatweb_02" {
+  source = "./modules/route_table_association"
+
+  subnet_id      = module.subnet_meatweb_02.id
+  route_table_id = module.rt_meatweb_01.id
+}
+
+module "rta_meatweb_03" {
+  source = "./modules/route_table_association"
+
+  subnet_id      = module.subnet_meatweb_03.id
+  route_table_id = module.rt_meatweb_01.id
 }
 
 module "sg_ec2_meatweb_01" {
@@ -175,7 +216,7 @@ module "rds_meatweb_01" {
   username             = "postgres"
   password             = "postgresMeatWebAdminPassword"
   vpc_security_group_ids = [module.sg_rds_meatweb_01.id]
-  publicly_accessible  = false
+  publicly_accessible  = true
   port                 = 5432
 
   parameter_group_name = "default.postgres16"
@@ -199,6 +240,32 @@ module "rds_meatweb_01" {
 
   tags = {
     Name = "RDS-MeatWeb-01"
+  }
+}
+
+module "keypair_ec2_meatweb_01" {
+  source = "./modules/key_pair"
+
+  key_name = "key-pair-ec2-meatweb-01"
+  public_key_path = "~/.ssh/id_rsa.pub"
+
+  tags = {
+    Name = "KeyPair-EC2-MeatWeb-01"
+  }
+}
+
+module "ec2_meatweb_01" {
+  source = "./modules/ec2"
+
+  ami                         = "ami-042c0d1e87e056819"
+  instance_type               = "t2.large"
+  subnet_id                   = module.subnet_meatweb_01.id
+  vpc_security_group_ids      = [module.sg_ec2_meatweb_01.id]
+  associate_public_ip_address = true
+  key_name                    = module.keypair_ec2_meatweb_01.key_name
+
+  tags = {
+    Name = "EC2-MeatWeb-01"
   }
 }
 

@@ -8,12 +8,6 @@ variable "cidr_block" {
   type        = string
 }
 
-variable "map_public_ip_on_launch" {
-  description = "Whether to map public IPs to instances launched in this subnet."
-  type        = bool
-  default     = true
-}
-
 variable "availability_zone" {
   description = "The availability zone for the subnet."
   type        = string

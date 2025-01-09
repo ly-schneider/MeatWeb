@@ -14,7 +14,7 @@ resource "aws_db_instance" "this" {
   option_group_name    = var.option_group_name
 
   storage_encrypted     = var.storage_encrypted
-  storage_type          = var.storage_encrypted
+  storage_type          = var.storage_type
   deletion_protection   = var.deletion_protection
   allocated_storage     = var.allocated_storage
 
