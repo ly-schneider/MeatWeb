@@ -1,6 +1,11 @@
-# Setup:
+# About
 
-Create a `secrets.tfvars` file in the `opentofu` directory with these values:
+This repository was created for a school project at GiBB. We (@ly-schneider, @RO0OGER, and @ivogra) developed a project that automates the deployment of an EC2 server configured as a Minecraft server using OpenTofu. The OpenTofu deployment also includes an RDS instance and a Lambda function. The Lambda function powers a Python-based Discord bot that saves Minecraft coordinates to the RDS instance.
+
+# Setup
+
+Create a `secrets.tfvars` file in the `opentofu` directory with the following values:
+
 ```
 DISCORD_PUBLIC_KEY = ""
 DB_HOST = ""
@@ -10,12 +15,16 @@ DB_USER = ""
 DB_PASSWORD = ""
 ```
 
-# Deploy:
+Fill in the appropriate values before proceeding with the deployment.
 
-### MacOS:
+# Deploy
 
-Run the `deploy.sh` script in the root folder
+### MacOS
 
-### Windows:
+Run the following script from the root directory:
+`./deploy.sh`
 
-Run the `deploy.ps1` script in the root folder
+### Windows
+
+Run the following script from the root directory:
+`.\deploy.ps1`
