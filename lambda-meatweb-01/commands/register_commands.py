@@ -12,7 +12,6 @@ with open("discord_commands.yaml", "r") as file:
 commands = yaml.safe_load(yaml_content)
 headers = {"Authorization": f"Bot {TOKEN}", "Content-Type": "application/json"}
 
-# Send the POST request for each command
 for command in commands:
     response = requests.post(URL, json=command, headers=headers)
     command_name = command["name"]

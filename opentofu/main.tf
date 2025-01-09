@@ -269,6 +269,26 @@ module "ec2_meatweb_01" {
   }
 }
 
+module "lambda_meatweb_01" {
+  source = "./modules/lambda"
+
+  role          = "LabRole"
+  description   = "Discord Bot for MeatWeb"
+  function_name = "lambda-meatweb-01"
+  handler       = "main.handler"
+  runtime       = "python3.13"
+  file_path     = "${path.module}/lambda_source_code.zip"
+  publish       = false
+
+  environment_variables = {
+    DISCORD_PUBLIC_KEY = var.discord_public_key
+  }
+
+  tags = {
+    Name = "Lambda-MeatWeb-01"
+  }
+}
+
 data "aws_availability_zones" "available" {
   state = "available"
 }

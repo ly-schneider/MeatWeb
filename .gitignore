@@ -193,3 +193,6 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,windows,intellij,visualstudiocode
+
+# zip source code
+lambda_source_code.zip
