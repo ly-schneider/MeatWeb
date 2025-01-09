@@ -1,6 +1,6 @@
 # About
 
-This repository was created for a school project at GiBB. We (@ly-schneider, @RO0OGER, and @ivogra) developed a project that automates the deployment of an EC2 server configured as a Minecraft server using OpenTofu. The OpenTofu deployment also includes an RDS instance and a Lambda function. The Lambda function powers a Python-based Discord bot that saves Minecraft coordinates to the RDS instance.
+This repository was created for a school project at GiBB. We ([@ly-schneider](https://github.com/ly-schneider), [@RO0OGER](https://github.com/RO0OGER), and [@ivogra](https://github.com/ivogra)) developed a project that automates the deployment of an EC2 instance configured as a Minecraft server using OpenTofu. The OpenTofu deployment also includes an RDS instance and a Lambda function. The Lambda function powers a Python-based Discord bot that saves Minecraft coordinates to the RDS instance.
 
 # Setup
 
