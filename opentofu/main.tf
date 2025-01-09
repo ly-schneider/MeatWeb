@@ -281,7 +281,12 @@ module "lambda_meatweb_01" {
   publish       = false
 
   environment_variables = {
-    DISCORD_PUBLIC_KEY = var.discord_public_key
+    DISCORD_PUBLIC_KEY = var.DISCORD_PUBLIC_KEY
+    DB_HOST = var.DB_HOST
+    DB_PORT = var.DB_PORT
+    DB_USER = var.DB_USER
+    DB_PASSWORD = var.DB_PASSWORD
+    DB_NAME = var.DB_NAME
   }
 
   tags = {
