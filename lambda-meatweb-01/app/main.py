@@ -45,14 +45,14 @@ def interact(raw_request):
     if raw_request.get("type") == 1:  # Discord PING
         return jsonify({"type": 1})
 
-    command = raw_request["data"]["name"]
+    command = raw_request["data"].get("name")
     subcommand = raw_request["data"].get("options", [{}])[0].get("name")
     user = raw_request["member"]["user"]["username"]
 
     if command == "cords":
         return jsonify(handle_cords_command(subcommand, raw_request, user))
 
-    return jsonify({"type": 4, "data": {"content": "Unbekannter Befehl."}})
+    return jsonify(create_response("Unbekannter Befehl."))
 
 def handle_cords_command(subcommand, raw_request, username):
     options = raw_request["data"].get("options", [{}])[0].get("options", [])
@@ -66,7 +66,7 @@ def handle_cords_command(subcommand, raw_request, username):
     if subcommand == "remove":
         return handle_remove_command(options, username)
 
-    return {"type": 4, "data": {"content": "Unbekannter Unterbefehl."}}
+    return create_response("Unbekannter Unterbefehl.")
 
 def handle_add_command(options, username):
     try:
@@ -80,7 +80,7 @@ def handle_add_command(options, username):
         )
 
         if existing:
-            return {"type": 4, "data": {"content": f"Koordinate '{name}' existiert bereits."}}
+            return create_response(f"Koordinate **{name}** existiert bereits.")
 
         execute_query(
             """
@@ -90,9 +90,9 @@ def handle_add_command(options, username):
             (name, x, y, z, profile_id)
         )
 
-        return {"type": 4, "data": {"content": f"Koordinate '{name}' hinzugefügt."}}
+        return create_response(f"Koordinate **{name}** hinzugefügt.")
     except Exception as e:
-        return {"type": 4, "data": {"content": f"Fehler: {str(e)}"}}
+        return create_response(f"Fehler: {str(e)}")
 
 def handle_list_command(username):
     try:
@@ -105,20 +105,20 @@ def handle_list_command(username):
         coordinates = execute_query(sql, (username,), fetchall=True)
 
         if not coordinates:
-            return {"type": 4, "data": {"content": "Keine Koordinaten gefunden."}}
+            return create_response("Keine Koordinaten gefunden.")
 
         formatted_coords = format_coordinates(coordinates)
-        return {"type": 4, "data": {"content": formatted_coords}}
+        return create_response(formatted_coords)
     except Exception as e:
-        return {"type": 4, "data": {"content": f"Fehler: {str(e)}"}}
+        return create_response(f"Fehler: {str(e)}")
 
 def handle_remove_command(options, username):
     try:
         name = get_option_value(options, "name")
-        profile_id = get_profile_id(username)
+        profile_id = get_profile_id(username)[0]
 
         if not profile_id:
-            return {"type": 4, "data": {"content": "Profil nicht gefunden."}}
+            return create_response("Profil nicht gefunden.")
 
         existing = execute_query(
             "SELECT ID_Coordinate FROM Coordinate WHERE Name = %s AND Profile_ID = %s;",
@@ -127,12 +127,17 @@ def handle_remove_command(options, username):
         )
 
         if not existing:
-            return {"type": 4, "data": {"content": f"Koordinate '{name}' nicht gefunden."}}
+            return create_response(f"Koordinate **{name}** nicht gefunden.")
 
-        execute_query("DELETE FROM Coordinate WHERE ID_Coordinate = %s;", (existing[0],))
-        return {"type": 4, "data": {"content": f"Koordinate '{name}' entfernt."}}
+        coordinate_id = int(existing[0])
+        execute_query("DELETE FROM Coordinate WHERE ID_Coordinate = %s;", (coordinate_id,))
+
+        return create_response(f"Koordinate **{name}** entfernt.")
     except Exception as e:
-        return {"type": 4, "data": {"content": f"Fehler: {str(e)}"}}
+        return create_response(f"Fehler: {str(e)}")
+
+def create_response(content):
+    return {"type": 4, "data": {"content": content, "flags": 64}}
 
 def get_profile_id(username):
     return execute_query("SELECT ID_Profile FROM Profile WHERE Name = %s;", (username,), fetchone=True)
@@ -154,12 +159,12 @@ def get_option_value(options, key):
 
 def format_coordinates(coordinates):
     utc = pytz.utc
-    cet = pytz.timezone('Europe/Berlin')
+    cet = pytz.timezone("Europe/Berlin")
 
     formatted_coords = []
     for name, x, y, z, created_at in coordinates:
         local_time = created_at.replace(tzinfo=utc).astimezone(cet).strftime("%d.%m.%Y %H:%M")
-        formatted_coords.append(f"{name}: X=**{x}**, Y=**{y}**, Z=**{z}**, Erstellt am: {local_time}")
+        formatted_coords.append(f"**{name}**: X=**{x}**, Y=**{y}**, Z=**{z}**, Erstellt am: {local_time}")
 
     return "\n".join(formatted_coords)
 
