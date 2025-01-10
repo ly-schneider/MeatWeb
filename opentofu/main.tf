@@ -212,12 +212,12 @@ module "rds_meatweb_01" {
   instance_class       = "db.t4g.small"
   engine               = "postgres"
   engine_version       = "16.3"
-  db_name              = "meatwebdb"
-  username             = "postgres"
-  password             = "postgresMeatWebAdminPassword"
+  db_name              = var.DB_NAME
+  username             = var.DB_USER
+  password             = var.DB_PASSWORD
   vpc_security_group_ids = [module.sg_rds_meatweb_01.id]
   publicly_accessible  = true
-  port                 = 5432
+  port                 = var.DB_PORT
 
   parameter_group_name = "default.postgres16"
   option_group_name    = "default:postgres-16"
