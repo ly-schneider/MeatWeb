@@ -257,7 +257,7 @@ module "keypair_ec2_meatweb_01" {
 module "ec2_meatweb_01" {
   source = "./modules/ec2"
 
-  ami                         = "ami-042c0d1e87e056819"
+  ami                         = "ami-079cb33ef719a7b78"
   instance_type               = "t2.large"
   subnet_id                   = module.subnet_meatweb_01.id
   vpc_security_group_ids      = [module.sg_ec2_meatweb_01.id]
