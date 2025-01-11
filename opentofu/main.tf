@@ -118,7 +118,7 @@ module "sg_ec2_meatweb_01" {
       cidr_blocks = ["0.0.0.0/0"]
     },
     {
-      description = "SSH"
+      description = "SSH/SFTP"
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
@@ -264,8 +264,23 @@ module "ec2_meatweb_01" {
   associate_public_ip_address = true
   key_name                    = module.keypair_ec2_meatweb_01.key_name
 
+  volume_size                 = 80
+  volume_type                 = "gp3"
+  delete_on_termination       = true
+
   tags = {
     Name = "EC2-MeatWeb-01"
+  }
+}
+
+module "eip_ec2_meatweb_01" {
+  source = "./modules/eip"
+
+  instance = module.ec2_meatweb_01.id
+  domain   = "vpc"
+
+  tags = {
+    Name = "EIP-EC2-MeatWeb-01"
   }
 }
 

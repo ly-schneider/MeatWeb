@@ -28,7 +28,21 @@ variable "key_name" {
   type        = string
 }
 
+variable "volume_size" {
+  description = "The size of the root volume in gibibytes"
+  type        = number
+}
+
+variable "volume_type" {
+  description = "The type of the root volume"
+  type        = string
+}
+
+variable "delete_on_termination" {
+  description = "Whether to delete the root volume when the instance is terminated"
+  type        = bool
+}
+
 variable "tags" {
-  description = "The tags for the key pair"
   type        = map(string)
 }

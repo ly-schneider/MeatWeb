@@ -1,5 +1,5 @@
-output "ec2_meatweb_01_public_ip" {
-  value = module.ec2_meatweb_01.public_ip
+output "eip_ec2_meatweb_01_public_ip" {
+  value = module.eip_ec2_meatweb_01.public_ip
 }
 
 output "rds_meatweb_01_endpoint" {
